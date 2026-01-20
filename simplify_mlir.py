@@ -31,7 +31,32 @@ def normalize_mlir(code: str) -> str:
 def strip_loc(code: str) -> str:
     if not code:
         return ""
-    return re.sub(r"\s*loc\(#.*?\)", "", code)
+    output = []
+    i = 0
+    length = len(code)
+    while i < length:
+        idx = code.find("loc(", i)
+        if idx == -1:
+            output.append(code[i:])
+            break
+        start = idx
+        while start > i and code[start - 1] in " \t":
+            start -= 1
+        output.append(code[i:start])
+        depth = 1
+        j = idx + 4
+        while j < length and depth:
+            char = code[j]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+            j += 1
+        if depth != 0:
+            output.append(code[idx:])
+            break
+        i = j
+    return "".join(output)
 
 
 def read_text(path: str) -> str:
@@ -79,7 +104,7 @@ def parse_args() -> argparse.Namespace:
         "--no-strip-loc",
         dest="strip_loc",
         action="store_false",
-        help="Disable removing loc(#...) annotations",
+        help="Disable removing loc(...) annotations",
     )
     parser.set_defaults(pretty=True, normalize=True, strip_loc=True)
     return parser.parse_args()
