@@ -81,7 +81,8 @@ def _format_report_log(report) -> str:
     def add_section(label: str, text: str) -> None:
         if not text:
             return
-        parts.append(f"{label}\n{text.rstrip('\n')}\n")
+        cleaned = text.rstrip("\n")
+        parts.append(f"{label}\n{cleaned}\n")
 
     add_section("[stdout]", getattr(report, "capstdout", "") or "")
     add_section("[stderr]", getattr(report, "capstderr", "") or "")
