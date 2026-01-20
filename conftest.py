@@ -6,29 +6,21 @@ from pathlib import Path
 import pytest
 
 
-_TRITON_CASE_DUMP_BASE = Path("/home/z00845017/triton-ops/triton_case_dump")
-
-
 def _case_name_from_nodeid(nodeid: str) -> str:
     name = re.sub(r"[^\w.-]+", "_", nodeid).strip("_")
     return name or "case"
-
-
-def _resolve_case_dump_base() -> Path:
-    base = os.environ.get("TRITON_CASE_DUMP_BASE")
-    if base:
-        return Path(base)
-    return _TRITON_CASE_DUMP_BASE
 
 
 def _resolve_triton_dump_base() -> Path:
     base = os.environ.get("DUMP_BASE_DIR")
     if base:
         return Path(base)
-    dump_dir_env = os.environ.get("DUMP_DIR") or os.environ.get("TRITON_DUMP_DIR")
-    if dump_dir_env:
-        return Path(dump_dir_env).parent
-    return _resolve_case_dump_base()
+    for name in ("DUMP_DIR", "TRITON_DUMP_DIR"):
+        dump_dir_env = os.environ.get(name)
+        if dump_dir_env:
+            dump_dir = Path(dump_dir_env)
+            return dump_dir.parent.parent
+    raise RuntimeError("DUMP_BASE_DIR is not set and DUMP_DIR/TRITON_DUMP_DIR are missing")
 
 
 def _resolve_dump_suffix() -> str:
@@ -82,13 +74,30 @@ def _append_text(path: Path, content: str) -> None:
         handle.write(content)
 
 
+def _format_report_log(report) -> str:
+    header = f"\n[{report.when}]\n"
+    parts = [header]
+
+    def add_section(label: str, text: str) -> None:
+        if not text:
+            return
+        parts.append(f"{label}\n{text.rstrip('\n')}\n")
+
+    add_section("[stdout]", getattr(report, "capstdout", "") or "")
+    add_section("[stderr]", getattr(report, "capstderr", "") or "")
+    add_section("[log]", getattr(report, "caplog", "") or "")
+
+    if report.failed:
+        longrepr = getattr(report, "longreprtext", "") or str(getattr(report, "longrepr", ""))
+        if longrepr:
+            add_section("[error]", longrepr)
+
+    return "".join(parts)
+
+
 @pytest.fixture(autouse=True)
 def triton_case_dump_path(request, monkeypatch):
     case_name = _case_name_from_nodeid(request.node.nodeid)
-    case_path = _resolve_case_dump_base() / case_name
-    case_path.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("TRITON_CASE_DUMP_PATH", str(case_path))
-
     dump_base = _resolve_triton_dump_base()
     dump_suffix = _resolve_dump_suffix()
     dump_dir = dump_base / case_name / dump_suffix
@@ -102,18 +111,12 @@ def triton_case_dump_path(request, monkeypatch):
 def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
-    case_path = _resolve_case_dump_base() / _case_name_from_nodeid(item.nodeid)
-    case_path.mkdir(parents=True, exist_ok=True)
-    header = f"\n[{report.when}]\n"
-    _append_text(case_path / "stdout.log", header + (getattr(report, "capstdout", "") or ""))
-    _append_text(case_path / "stderr.log", header + (getattr(report, "capstderr", "") or ""))
-    _append_text(case_path / "pytest.log", header + (getattr(report, "caplog", "") or ""))
-
-    if report.failed:
-        longrepr = getattr(report, "longreprtext", "") or str(getattr(report, "longrepr", ""))
-        if longrepr:
-            _append_text(case_path / "error.log", header + longrepr + "\n")
-            _append_text(case_path / "stderr.log", header + longrepr + "\n")
+    case_name = _case_name_from_nodeid(item.nodeid)
+    dump_base = _resolve_triton_dump_base()
+    dump_suffix = _resolve_dump_suffix()
+    dump_dir = dump_base / case_name / dump_suffix
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    _append_text(dump_dir / "full.log", _format_report_log(report))
 
 
 def pytest_collection_modifyitems(session, config, items):
