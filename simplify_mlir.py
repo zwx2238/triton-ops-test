@@ -28,6 +28,12 @@ def normalize_mlir(code: str) -> str:
     return re.sub(r"%[A-Za-z0-9_]+", "%_", code)
 
 
+def strip_loc(code: str) -> str:
+    if not code:
+        return ""
+    return re.sub(r"\s*loc\(#.*?\)", "", code)
+
+
 def read_text(path: str) -> str:
     if path == "-":
         return sys.stdin.read()
@@ -69,7 +75,13 @@ def parse_args() -> argparse.Namespace:
         action="store_false",
         help="Disable SSA name normalization",
     )
-    parser.set_defaults(pretty=True, normalize=True)
+    parser.add_argument(
+        "--no-strip-loc",
+        dest="strip_loc",
+        action="store_false",
+        help="Disable removing loc(#...) annotations",
+    )
+    parser.set_defaults(pretty=True, normalize=True, strip_loc=True)
     return parser.parse_args()
 
 
@@ -80,6 +92,8 @@ def main() -> int:
         content = format_mlir(content)
     if args.normalize:
         content = normalize_mlir(content)
+    if args.strip_loc:
+        content = strip_loc(content)
     write_text(args.output, content)
     return 0
 
