@@ -6,3 +6,6 @@ TA_DST_ENV="ta_dst_env"
 # Bishengir binary directories (absolute paths)
 BISHENGIR_SRC_DIR="/abs/path/to/bishengir/src/bin"
 BISHENGIR_DST_DIR="/abs/path/to/bishengir/dst/bin"
+
+# Base dir for Triton IR dumps (absolute path)
+DUMP_BASE_DIR="/abs/path/to/triton/dump/base"

@@ -76,6 +76,36 @@ if [[ ! -d "$bishengir_dir" ]]; then
   exit 1
 fi
 
+# Resolve DUMP_DIR for Triton IR dumps
+if [[ -z "${DUMP_BASE_DIR:-}" ]]; then
+  echo "DUMP_BASE_DIR is not configured in $env_file" >&2
+  exit 1
+fi
+
+if [[ -e "$DUMP_BASE_DIR" && ! -d "$DUMP_BASE_DIR" ]]; then
+  echo "DUMP_BASE_DIR is not a directory: $DUMP_BASE_DIR" >&2
+  exit 1
+fi
+
+dump_base_dir="$DUMP_BASE_DIR"
+if [[ "$dump_base_dir" != "/" ]]; then
+  dump_base_dir="${dump_base_dir%/}"
+fi
+
+if [[ "$dump_base_dir" != /* ]]; then
+  echo "DUMP_BASE_DIR must be an absolute path: $dump_base_dir" >&2
+  exit 1
+fi
+
+if [[ "$dump_base_dir" == "/" ]]; then
+  echo "DUMP_BASE_DIR cannot be '/'" >&2
+  exit 1
+fi
+
+export DUMP_BASE_DIR
+export TRITON_DUMP_SUFFIX="ta_${ta}_bishengir_${bishengir}"
+export TRITON_KERNEL_DUMP="${TRITON_KERNEL_DUMP:-1}"
+
 # Activate conda env for TA
 if ! command -v conda >/dev/null 2>&1; then
   echo "conda not found in PATH" >&2
