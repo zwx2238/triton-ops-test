@@ -125,4 +125,23 @@ conda activate "$ta_env"
 # Prepend bishengir dir to PATH
 export PATH="$bishengir_dir:$PATH"
 
-exec "$script_dir/test.sh" --ta "$ta" --bishengir "$bishengir"
+status=0
+"$script_dir/test.sh" --ta "$ta" --bishengir "$bishengir" || status=$?
+
+simplify_failed=0
+while IFS= read -r -d '' mlir_file; do
+  if [[ "$mlir_file" == *-simplify.mlir ]]; then
+    continue
+  fi
+  simplify_out="${mlir_file%.mlir}-simplify.mlir"
+  if ! python3 "$script_dir/simplify_mlir.py" "$mlir_file" -o "$simplify_out"; then
+    echo "simplify_mlir failed: $mlir_file" >&2
+    simplify_failed=1
+  fi
+done < <(find "$dump_base_dir" -type f -name "*.mlir" -print0)
+
+if [[ "$status" -eq 0 && "$simplify_failed" -ne 0 ]]; then
+  status=1
+fi
+
+exit "$status"
